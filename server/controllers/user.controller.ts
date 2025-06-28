@@ -126,7 +126,18 @@ const userController = (socket: FakeSOSocket) => {
    * @returns A promise resolving to void.
    */
   const getUsers = async (_: Request, res: Response): Promise<void> => {
-    // TODO: Task 1 - Implement the getUsers endpoint
+    try {
+      const result = await getUsersList();
+  
+      if ('error' in result) {
+        res.status(500).json(result);
+        return;
+      }
+  
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   };
 
   /**
@@ -186,19 +197,30 @@ const userController = (socket: FakeSOSocket) => {
    * @param res The response, either confirming the update or returning an error.
    * @returns A promise resolving to void.
    */
-  const updateBiography = async (req: UpdateBiographyRequest, res: Response): Promise<void> => {
+  const updateBiography = async (
+    req: UpdateBiographyRequest,
+    res: Response
+  ): Promise<void> => {
     try {
-      // TODO: Task 1 - Implement the updateBiography function, including request validation
+      const { username, biography } = req.body;
+      if (typeof username !== 'string' || typeof biography !== 'string') {
+        res
+          .status(400)
+          .json({ error: 'Invalid request body. username and biography are required.' });
+        return;
+      }
 
-      // Emit socket event for real-time updates
-      socket.emit('userUpdate', {
-        user: updatedUser,
-        type: 'updated',
-      });
+      const result = await updateUser(username, { biography });
+      if ('error' in result) {
+        const status = result.error === 'User not found' ? 404 : 500;
+        res.status(status).json(result);
+        return;
+      }
 
-      // TODO: Task 1 - Return the updated user object
+      socket.emit('userUpdate', { user: result, type: 'updated' });
+      res.status(200).json(result);
     } catch (error) {
-      // TODO: Task 1 - Handle errors appropriately
+      res.status(500).json({ error: 'Internal server error' });
     }
   };
 
@@ -208,9 +230,8 @@ const userController = (socket: FakeSOSocket) => {
   router.patch('/resetPassword', resetPassword);
   router.get('/getUser/:username', getUser);
   router.delete('/deleteUser/:username', deleteUser);
-
-  // TODO: Task 1- Add a route for updating a user's biography
-  // TODO: Task 1 - Add a route for getting all users
+  router.patch('/updateBiography', updateBiography);
+  router.get('/getUsers', getUsers);
 
   return router;
 };

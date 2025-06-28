@@ -9,9 +9,29 @@ import {
 } from '../../services/user.service';
 import { SafeUser, User, UserCredentials } from '../../types/user';
 import { user, safeUser } from '../mockData.models';
+import mongoose from 'mongoose';
+
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockingoose = require('mockingoose');
+
+jest.mock('mongoose', () => {
+  const mongoose = jest.requireActual('mongoose');
+  return {
+    ...mongoose,
+    connect: jest.fn().mockResolvedValue(undefined)
+  };
+});
+
+jest.useFakeTimers();
+afterEach(() => {
+  jest.clearAllTimers();
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  jest.useRealTimers();
+});
 
 describe('User model', () => {
   beforeEach(() => {
@@ -90,7 +110,23 @@ describe('getUsersList', () => {
     expect(retrievedUsers[0].dateJoined).toEqual(safeUser.dateJoined);
   });
 
-  // TODO: Task 1 - Add more tests for getUsersList
+  it('should return error when database query fails', async () => {
+    const dbError = new Error('Database connection failed');
+
+    mockingoose(UserModel).toReturn(dbError, 'find');
+
+    const result = await getUsersList();
+
+    expect(result).toEqual({ error: 'Error occurred when retrieving users: Error: Database connection failed' });
+  });
+
+  it('should return empty array when no users exist', async () => {
+    mockingoose(UserModel).toReturn([], 'find');
+
+    const result = await getUsersList();
+
+    expect(result).toEqual([]);
+  });
 });
 
 describe('loginUser', () => {
@@ -244,4 +280,13 @@ describe('updateUser', () => {
 
     expect('error' in updatedError).toBe(true);
   });
+});
+
+afterAll(async () => {
+  mockingoose.resetAll();
+  jest.clearAllMocks();
+  jest.restoreAllMocks();
+  if (global.gc) {
+    global.gc();
+  }
 });

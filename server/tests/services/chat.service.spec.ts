@@ -23,6 +23,16 @@ describe('Chat service', () => {
     jest.clearAllMocks();
   });
 
+  const mockChatPayload: CreateChatPayload = {
+    participants: ['user1', 'user2'],
+    messages: [{
+      msg: 'Hello!',
+      msgFrom: 'testUser',
+      msgDateTime: new Date('2025-01-01T00:00:00Z'),
+      type: 'direct',
+    }]
+  };
+
   // ----------------------------------------------------------------------------
   // 1. saveChat
   // ----------------------------------------------------------------------------

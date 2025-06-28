@@ -12,22 +12,33 @@ import { GameInstance } from '../types';
  * - `handleMakeMove`: A function to send the player's move to the server via a socket event.
  * - `handleInputChange`: A function to update the move state based on user input (1 to 3 objects).
  */
-
 const useNimGamePage = (gameState: GameInstance) => {
   const { user, socket } = useUserContext();
 
-  // TODO: Task 2 - Define the state variable to store the current move (`move`)
+  const [move, setMove] = useState<number>(1);
 
   const handleMakeMove = async () => {
-    // TODO: Task 2 - Emit a socket event to make a move in the Nim game
+    const movePayload = {
+      gameID: gameState.gameID,
+      move: {
+        playerID: user.username,
+        gameID: gameState.gameID,
+        move: {
+          numObjects: move,
+        },
+      },
+    };
+
+    socket.emit('makeMove', movePayload);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // TODO: Task 2 - Update the move state based on the user input.
-    // The move should be a number between 1 and 3, and apply this validation before
-    // updating the state.
-
     const { value } = e.target;
+    const numValue = parseInt(value, 10);
+
+    if (!Number.isNaN(numValue) && numValue >= 1 && numValue <= 3) {
+      setMove(numValue);
+    }
   };
 
   return {
