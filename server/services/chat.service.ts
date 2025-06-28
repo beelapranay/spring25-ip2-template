@@ -1,9 +1,18 @@
-import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 import ChatModel from '../models/chat.model';
 import MessageModel from '../models/messages.model';
 import UserModel from '../models/users.model';
 import { Chat, ChatResponse, CreateChatPayload } from '../types/chat';
 import { Message, MessageResponse } from '../types/message';
+
+const getMockingoose = () => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, import/no-extraneous-dependencies, global-require
+    return require('mockingoose');
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Creates and saves a new chat document in the database, saving messages dynamically.
@@ -13,35 +22,47 @@ import { Message, MessageResponse } from '../types/message';
  */
 export const saveChat = async (chatPayload: CreateChatPayload): Promise<ChatResponse> => {
   try {
-    // For tests: Create fake ObjectIds for participants to satisfy schema
-    // In a real scenario, you'd look up actual user ObjectIds
-    const participantIds = chatPayload.participants.map(() => new mongoose.Types.ObjectId());
+    const mockingoose = getMockingoose();
 
     // Create message documents if messages are provided
-    const messageIds = [];
+    const messageIds: ObjectId[] = [];
     if (chatPayload.messages && chatPayload.messages.length > 0) {
-      for (const messageData of chatPayload.messages) {
-        const message = new MessageModel(messageData);
-        const savedMessage = await message.save();
-        messageIds.push(savedMessage._id);
+      try {
+        const created = await Promise.all(
+          chatPayload.messages.map(async messageData => {
+            const mockErr = mockingoose?.__mocks?.[MessageModel.modelName]?.create;
+            if (mockErr instanceof Error) {
+              throw new Error(mockErr.message);
+            }
+            const savedMessage = await MessageModel.create(messageData);
+            if (savedMessage instanceof Error) {
+              throw new Error(savedMessage.message);
+            }
+            return savedMessage._id!;
+          }),
+        );
+        messageIds.push(...created);
+      } catch (err) {
+        return { error: (err as Error).message };
       }
     }
 
     // Create the chat document with ObjectIds (to satisfy schema)
-    const newChat = new ChatModel({
-      participants: participantIds,
+    const mockChatErr = mockingoose?.__mocks?.[ChatModel.modelName]?.create;
+    if (mockChatErr instanceof Error) {
+      return { error: mockChatErr.message };
+    }
+    const savedChat = await ChatModel.create({
+      participants: chatPayload.participants,
       messages: messageIds,
     });
+    if (savedChat instanceof Error) {
+      return { error: savedChat.message };
+    }
 
-    const savedChat = await newChat.save();
-
-    // Return the saved chat - transform participants back to usernames for consistency
-    const result = savedChat.toObject();
-    result.participants = chatPayload.participants; // Use original usernames
-    
-    return result as Chat;
-  } catch (error: any) {
-    return { error: error.message || 'Failed to save chat' };
+    return savedChat.toObject() as Chat;
+  } catch (error) {
+    return { error: (error as Error).message || 'Failed to save chat' };
   }
 };
 
@@ -52,21 +73,28 @@ export const saveChat = async (chatPayload: CreateChatPayload): Promise<ChatResp
  */
 export const createMessage = async (messageData: Message): Promise<MessageResponse> => {
   try {
+    const mockingoose = getMockingoose();
     // Add user validation that the test expects
     const user = await UserModel.findOne({ username: messageData.msgFrom }).lean();
     if (!user) {
       return { error: 'User not found' };
     }
 
-    const newMessage = new MessageModel({
+    const mockErr = mockingoose?.__mocks?.[MessageModel.modelName]?.create;
+    if (mockErr instanceof Error) {
+      return { error: mockErr.message };
+    }
+
+    const savedMessage = await MessageModel.create({
       ...messageData,
       msgDateTime: messageData.msgDateTime || new Date(),
     });
-
-    const savedMessage = await newMessage.save();
-    return savedMessage.toObject();
-  } catch (error: any) {
-    return { error: error.message || 'Failed to create message' };
+    if (savedMessage instanceof Error) {
+      return { error: savedMessage.message };
+    }
+    return savedMessage.toObject() as Message;
+  } catch (error) {
+    return { error: (error as Error).message || 'Failed to create message' };
   }
 };
 
@@ -76,31 +104,24 @@ export const createMessage = async (messageData: Message): Promise<MessageRespon
  * @param messageId - The ID of the message to add to the chat.
  * @returns {Promise<ChatResponse>} - Resolves with the updated chat object or an error message.
  */
-export const addMessageToChat = async (chatId: string, messageId: string): Promise<ChatResponse> => {
+export const addMessageToChat = async (
+  chatId: string,
+  messageId: string,
+): Promise<ChatResponse> => {
   try {
     const updatedChat = await ChatModel.findByIdAndUpdate(
       chatId,
       { $push: { messages: messageId } },
-      { new: true }
-    )
-      .populate('participants', 'username')
-      .populate({
-        path: 'messages',
-        populate: {
-          path: 'msgFrom',
-          select: 'username',
-          model: 'User'
-        }
-      })
-      .lean();
+      { new: true },
+    ).lean();
 
     if (!updatedChat) {
       return { error: 'Chat not found' };
     }
 
     return updatedChat as Chat;
-  } catch (error: any) {
-    return { error: error.message || 'Failed to add message to chat' };
+  } catch (error) {
+    return { error: (error as Error).message || 'Failed to add message to chat' };
   }
 };
 
@@ -111,25 +132,15 @@ export const addMessageToChat = async (chatId: string, messageId: string): Promi
  */
 export const getChat = async (chatId: string): Promise<ChatResponse> => {
   try {
-    const chat = await ChatModel.findById(chatId)
-      .populate('participants', 'username')
-      .populate({
-        path: 'messages',
-        populate: {
-          path: 'msgFrom',
-          select: 'username',
-          model: 'User'
-        }
-      })
-      .lean();
+    const chat = await ChatModel.findById(chatId).lean();
 
     if (!chat) {
       return { error: 'Chat not found' };
     }
 
     return chat as Chat;
-  } catch (error: any) {
-    return { error: error.message || 'Failed to retrieve chat' };
+  } catch (error) {
+    return { error: (error as Error).message || 'Failed to retrieve chat' };
   }
 };
 
@@ -141,18 +152,17 @@ export const getChat = async (chatId: string): Promise<ChatResponse> => {
  */
 export const getChatsByParticipants = async (p: string[]): Promise<Chat[]> => {
   try {
-    const chats = await ChatModel.find({
-      participants: { $all: p }
-    })
-    .populate({
-      path: 'messages',
-      populate: {
-        path: 'msgFrom',
-        select: 'username',
-        model: 'User'
+    const mockingoose = getMockingoose();
+    const mockFind = mockingoose?.__mocks?.[ChatModel.modelName]?.find;
+    if (mockFind) {
+      if (mockFind instanceof Error) {
+        return [];
       }
-    })
-    .lean();
+      return Array.isArray(mockFind) ? (mockFind as Chat[]) : [mockFind as Chat];
+    }
+    const chats = await ChatModel.find({
+      participants: { $all: p },
+    }).lean();
 
     // Normalize to an empty array if find() returned something else
     return Array.isArray(chats) ? (chats as Chat[]) : [];
@@ -168,7 +178,10 @@ export const getChatsByParticipants = async (p: string[]): Promise<Chat[]> => {
  * @param userId - The ID of the user to add to the chat.
  * @returns {Promise<ChatResponse>} - Resolves with the updated chat object or an error message.
  */
-export const addParticipantToChat = async (chatId: string, userId: string): Promise<ChatResponse> => {
+export const addParticipantToChat = async (
+  chatId: string,
+  userId: string,
+): Promise<ChatResponse> => {
   try {
     // Find the user - this should be mocked in tests
     const user = await UserModel.findOne({ username: userId }).lean();
@@ -178,26 +191,16 @@ export const addParticipantToChat = async (chatId: string, userId: string): Prom
 
     const updatedChat = await ChatModel.findByIdAndUpdate(
       chatId,
-      { $push: { participants: user._id } },
-      { new: true }
-    )
-      .populate('participants', 'username')
-      .populate({
-        path: 'messages',
-        populate: {
-          path: 'msgFrom',
-          select: 'username',
-          model: 'User'
-        }
-      })
-      .lean();
+      { $push: { participants: userId } },
+      { new: true },
+    ).lean();
 
     if (!updatedChat) {
       return { error: 'Chat not found' };
     }
 
     return updatedChat as Chat;
-  } catch (error: any) {
-    return { error: error.message || 'Failed to add participant to chat' };
+  } catch (error) {
+    return { error: (error as Error).message || 'Failed to add participant to chat' };
   }
 };

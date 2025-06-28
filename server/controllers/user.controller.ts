@@ -128,12 +128,12 @@ const userController = (socket: FakeSOSocket) => {
   const getUsers = async (_: Request, res: Response): Promise<void> => {
     try {
       const result = await getUsersList();
-  
+
       if ('error' in result) {
         res.status(500).json(result);
         return;
       }
-  
+
       res.status(200).json(result);
     } catch (error) {
       res.status(500).json({ error: 'Internal server error' });
@@ -197,10 +197,7 @@ const userController = (socket: FakeSOSocket) => {
    * @param res The response, either confirming the update or returning an error.
    * @returns A promise resolving to void.
    */
-  const updateBiography = async (
-    req: UpdateBiographyRequest,
-    res: Response
-  ): Promise<void> => {
+  const updateBiography = async (req: UpdateBiographyRequest, res: Response): Promise<void> => {
     try {
       const { username, biography } = req.body;
       if (typeof username !== 'string' || typeof biography !== 'string') {

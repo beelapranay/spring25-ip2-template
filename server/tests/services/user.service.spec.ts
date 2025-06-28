@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import UserModel from '../../models/users.model';
 import {
   deleteUserByUsername,
@@ -9,17 +10,15 @@ import {
 } from '../../services/user.service';
 import { SafeUser, User, UserCredentials } from '../../types/user';
 import { user, safeUser } from '../mockData.models';
-import mongoose from 'mongoose';
-
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockingoose = require('mockingoose');
 
 jest.mock('mongoose', () => {
-  const mongoose = jest.requireActual('mongoose');
+  const mongooseActual = jest.requireActual('mongoose');
   return {
-    ...mongoose,
-    connect: jest.fn().mockResolvedValue(undefined)
+    ...mongooseActual,
+    connect: jest.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -117,7 +116,9 @@ describe('getUsersList', () => {
 
     const result = await getUsersList();
 
-    expect(result).toEqual({ error: 'Error occurred when retrieving users: Error: Database connection failed' });
+    expect(result).toEqual({
+      error: 'Error occurred when retrieving users: Error: Database connection failed',
+    });
   });
 
   it('should return empty array when no users exist', async () => {

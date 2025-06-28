@@ -18,11 +18,10 @@ const userSchema: Schema = new Schema(
     },
     biography: {
       type: String,
-      default: ''
-    }
+      default: '',
+    },
   },
   { collection: 'User' },
 );
 
 export default userSchema;
-

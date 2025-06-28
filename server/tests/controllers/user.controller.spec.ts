@@ -298,7 +298,23 @@ describe('Test userController', () => {
       expect(getUsersListSpy).toHaveBeenCalled();
     });
 
-    // TODO: Task 1 - Add more tests
+    it('should return 500 if service returns an error', async () => {
+      getUsersListSpy.mockResolvedValueOnce({ error: 'Database error' });
+
+      const response = await supertest(app).get(`/user/getUsers`);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Database error' });
+    });
+
+    it('should return 500 if service throws an error', async () => {
+      getUsersListSpy.mockRejectedValueOnce(new Error('Unexpected'));
+
+      const response = await supertest(app).get(`/user/getUsers`);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
   });
 
   describe('DELETE /deleteUser', () => {
@@ -348,6 +364,72 @@ describe('Test userController', () => {
       });
     });
 
-    // TODO: Task 1 - Add more tests
+    it('should return 400 if username is missing', async () => {
+      const mockReqBody: { biography: string } = {
+        biography: 'bio',
+      };
+
+      const response = await supertest(app).patch('/user/updateBiography').send(mockReqBody);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Invalid request body. username and biography are required.',
+      });
+    });
+
+    it('should return 400 if biography is missing', async () => {
+      const mockReqBody: { username: string } = {
+        username: mockUser.username,
+      };
+
+      const response = await supertest(app).patch('/user/updateBiography').send(mockReqBody);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        error: 'Invalid request body. username and biography are required.',
+      });
+    });
+
+    it('should return 404 if the user is not found', async () => {
+      const mockReqBody = {
+        username: mockUser.username,
+        biography: 'bio',
+      };
+
+      updatedUserSpy.mockResolvedValueOnce({ error: 'User not found' });
+
+      const response = await supertest(app).patch('/user/updateBiography').send(mockReqBody);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'User not found' });
+    });
+
+    it('should return 500 if updateUser returns an error', async () => {
+      const mockReqBody = {
+        username: mockUser.username,
+        biography: 'bio',
+      };
+
+      updatedUserSpy.mockResolvedValueOnce({ error: 'Database failure' });
+
+      const response = await supertest(app).patch('/user/updateBiography').send(mockReqBody);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Database failure' });
+    });
+
+    it('should return 500 if updateUser throws an error', async () => {
+      const mockReqBody = {
+        username: mockUser.username,
+        biography: 'bio',
+      };
+
+      updatedUserSpy.mockRejectedValueOnce(new Error('Unexpected'));
+
+      const response = await supertest(app).patch('/user/updateBiography').send(mockReqBody);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Internal server error' });
+    });
   });
 });

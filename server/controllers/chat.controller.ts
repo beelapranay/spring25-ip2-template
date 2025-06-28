@@ -11,6 +11,7 @@ import { populateDocument } from '../utils/database.util';
 import {
   CreateChatRequest,
   AddMessageRequestToChat,
+  AddMessagePayload,
   AddParticipantRequest,
   ChatIdRequest,
   GetChatByParticipantsRequest,
@@ -28,23 +29,24 @@ const chatController = (socket: FakeSOSocket) => {
    * @param req The incoming request containing chat data.
    * @returns `true` if the body contains valid chat fields; otherwise, `false`.
    */
-  const isCreateChatRequestValid = (req: CreateChatRequest): boolean => {
-    return !!(
+  const isCreateChatRequestValid = (req: CreateChatRequest): boolean =>
+    !!(
       req.body &&
       req.body.participants &&
       Array.isArray(req.body.participants) &&
       req.body.participants.length > 0 &&
-      req.body.participants.every((participant: string) => typeof participant === 'string' && participant.trim().length > 0)
+      req.body.participants.every(
+        (participant: string) => typeof participant === 'string' && participant.trim().length > 0,
+      )
     );
-  };
 
   /**
    * Validates that the request body contains all required fields for a message.
    * @param req The incoming request containing message data.
    * @returns `true` if the body contains valid message fields; otherwise, `false`.
    */
-  const isAddMessageRequestValid = (req: AddMessageRequestToChat): boolean => {
-    return !!(
+  const isAddMessageRequestValid = (req: AddMessageRequestToChat): boolean =>
+    !!(
       req.body &&
       req.body.msg &&
       req.body.msgFrom &&
@@ -53,7 +55,6 @@ const chatController = (socket: FakeSOSocket) => {
       req.body.msg.trim().length > 0 &&
       req.body.msgFrom.trim().length > 0
     );
-  };
 
   /**
    * Validates that the request body contains all required fields for a participant.
@@ -65,12 +66,12 @@ const chatController = (socket: FakeSOSocket) => {
     if (!req.body || typeof req.body !== 'object') {
       return false;
     }
-    
+
     // Check if userId exists and is a string (to match test expectations)
     if (!('userId' in req.body) || typeof req.body.userId !== 'string') {
       return false;
     }
-    
+
     // Now we can safely access userId as a string
     return req.body.userId.trim().length > 0;
   };
@@ -105,7 +106,7 @@ const chatController = (socket: FakeSOSocket) => {
       // Emit chatUpdate socket event
       const updatePayload: ChatUpdatePayload = {
         chat: populatedChat as Chat,
-        type: 'created'
+        type: 'created',
       };
       socket.emit('chatUpdate', updatePayload);
 
@@ -120,23 +121,28 @@ const chatController = (socket: FakeSOSocket) => {
    * A chatUpdate socket event is emitted to notify the client that a new message was added to the chat.
    * This socket event should only be emitted to users currently in the specific chat room.
    */
-  const addMessageToChatRoute = async (req: AddMessageRequestToChat, res: Response): Promise<void> => {
+  const addMessageToChatRoute = async (
+    req: AddMessageRequestToChat,
+    res: Response,
+  ): Promise<void> => {
     try {
       if (!isAddMessageRequestValid(req)) {
         res.status(400).json({ error: 'Invalid request body' });
         return;
       }
 
-      const { chatId } = req.params;
-      
+      const { chatId, chatID } = req.params as { chatId?: string; chatID?: string };
+      const resolvedChatId = chatId || chatID;
+
       // Create the message - ensure all required fields are properly typed
+      const { type } = req.body as Partial<AddMessagePayload>;
       const messageData: Message = {
         msg: req.body.msg,
         msgFrom: req.body.msgFrom,
         msgDateTime: req.body.msgDateTime || new Date(),
-        type: (req.body as any).type || 'direct'  // Temporary type assertion
+        type: type || 'direct',
       };
-      
+
       const messageResult = await createMessage(messageData);
 
       if ('error' in messageResult) {
@@ -145,7 +151,7 @@ const chatController = (socket: FakeSOSocket) => {
       }
 
       // Add message to chat
-      const chatResult = await addMessageToChat(chatId, messageResult._id!.toString());
+      const chatResult = await addMessageToChat(resolvedChatId!, messageResult._id!.toString());
 
       if ('error' in chatResult) {
         res.status(500).json(chatResult);
@@ -163,9 +169,9 @@ const chatController = (socket: FakeSOSocket) => {
       // Emit chatUpdate socket event only to users in the specific chat room
       const updatePayload: ChatUpdatePayload = {
         chat: populatedChat as Chat,
-        type: 'newMessage'
+        type: 'newMessage',
       };
-      socket.to(chatId).emit('chatUpdate', updatePayload);
+      socket.to(resolvedChatId!).emit('chatUpdate', updatePayload);
 
       res.status(200).json(populatedChat);
     } catch (error) {
@@ -179,8 +185,9 @@ const chatController = (socket: FakeSOSocket) => {
    */
   const getChatRoute = async (req: ChatIdRequest, res: Response): Promise<void> => {
     try {
-      const { chatId } = req.params;
-      const result = await getChat(chatId);
+      const { chatId, chatID } = req.params as { chatId?: string; chatID?: string };
+      const resolvedChatId = chatId || chatID;
+      const result = await getChat(resolvedChatId!);
 
       if ('error' in result) {
         res.status(404).json(result);
@@ -204,17 +211,21 @@ const chatController = (socket: FakeSOSocket) => {
   /**
    * Handles POST requests to add a participant to an existing chat using addParticipantToChat.
    */
-  const addParticipantToChatRoute = async (req: AddParticipantRequest, res: Response): Promise<void> => {
+  const addParticipantToChatRoute = async (
+    req: AddParticipantRequest,
+    res: Response,
+  ): Promise<void> => {
     try {
       if (!isAddParticipantRequestValid(req)) {
         res.status(400).json({ error: 'Invalid request body' });
         return;
       }
 
-      const { chatId } = req.params;
+      const { chatId, chatID } = req.params as { chatId?: string; chatID?: string };
+      const resolvedChatId = chatId || chatID;
       const { userId } = req.body;
 
-      const result = await addParticipantToChat(chatId, userId);
+      const result = await addParticipantToChat(resolvedChatId!, userId);
 
       if ('error' in result) {
         res.status(400).json(result);
@@ -232,32 +243,31 @@ const chatController = (socket: FakeSOSocket) => {
    * Populates all of the chat documents before returning a response.
    * Throws an error if the population fails for any of the chats.
    */
-  const getChatsByUserRoute = async (req: GetChatByParticipantsRequest, res: Response): Promise<void> => {
+  const getChatsByUserRoute = async (
+    req: GetChatByParticipantsRequest,
+    res: Response,
+  ): Promise<void> => {
     try {
       const { username } = req.params;
       const chats = await getChatsByParticipants([username]);
 
-      // Populate all chat documents
-      const populatedChats = [];
-      for (const chat of chats) {
-        const populatedChat = await populateDocument(chat._id!.toString(), 'chat');
+      const populatedChatsResults = await Promise.all(
+        chats.map(chat => populateDocument(chat._id!.toString(), 'chat')),
+      );
 
-        if ('error' in populatedChat) {
-          res.status(500).send('Error retrieving chat: Failed populating chats');
-          return;
-        }
-
-        populatedChats.push(populatedChat);
+      if (populatedChatsResults.some(c => 'error' in c)) {
+        res.status(500).send('Error retrieving chat: Failed populating chats');
+        return;
       }
 
-      res.status(200).json(populatedChats);
+      res.status(200).json(populatedChatsResults);
     } catch (error) {
       res.status(500).json({ error: 'Internal server error' });
     }
   };
 
   // Socket event listeners
-  socket.on('connection', (conn) => {
+  socket.on('connection', conn => {
     conn.on('joinChat', (chatID: string) => {
       if (chatID && typeof chatID === 'string' && chatID.trim().length > 0) {
         conn.join(chatID);
