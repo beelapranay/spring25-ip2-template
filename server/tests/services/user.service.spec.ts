@@ -25,6 +25,8 @@ jest.mock('mongoose', () => {
 jest.useFakeTimers();
 afterEach(() => {
   jest.clearAllTimers();
+  jest.clearAllMocks();
+  jest.restoreAllMocks();
 });
 
 afterAll(async () => {

@@ -6,16 +6,28 @@ import * as databaseUtil from '../../utils/database.util';
 import { Chat } from '../../types/chat';
 import { Message } from '../../types/message';
 
-/**
- * Spies on the service functions
- */
-const saveChatSpy = jest.spyOn(chatService, 'saveChat');
-const createMessageSpy = jest.spyOn(chatService, 'createMessage');
-const addMessageSpy = jest.spyOn(chatService, 'addMessageToChat');
-const getChatSpy = jest.spyOn(chatService, 'getChat');
-const addParticipantSpy = jest.spyOn(chatService, 'addParticipantToChat');
-const populateDocumentSpy = jest.spyOn(databaseUtil, 'populateDocument');
-const getChatsByParticipantsSpy = jest.spyOn(chatService, 'getChatsByParticipants');
+let saveChatSpy: jest.SpyInstance;
+let createMessageSpy: jest.SpyInstance;
+let addMessageSpy: jest.SpyInstance;
+let getChatSpy: jest.SpyInstance;
+let addParticipantSpy: jest.SpyInstance;
+let populateDocumentSpy: jest.SpyInstance;
+let getChatsByParticipantsSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  saveChatSpy = jest.spyOn(chatService, 'saveChat');
+  createMessageSpy = jest.spyOn(chatService, 'createMessage');
+  addMessageSpy = jest.spyOn(chatService, 'addMessageToChat');
+  getChatSpy = jest.spyOn(chatService, 'getChat');
+  addParticipantSpy = jest.spyOn(chatService, 'addParticipantToChat');
+  populateDocumentSpy = jest.spyOn(databaseUtil, 'populateDocument');
+  getChatsByParticipantsSpy = jest.spyOn(chatService, 'getChatsByParticipants');
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
+  jest.restoreAllMocks();
+});
 
 /**
  * Sample test suite for the /chat endpoints

@@ -23,6 +23,11 @@ describe('Chat service', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
   const mockChatPayload: CreateChatPayload = {
     participants: ['user1', 'user2'],
     messages: [
@@ -399,5 +404,14 @@ describe('Chat service', () => {
       const result = await getChatsByParticipants(['user1']);
       expect(result).toHaveLength(0);
     });
+  });
+
+  afterAll(() => {
+    mockingoose.resetAll();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    if (global.gc) {
+      global.gc();
+    }
   });
 });

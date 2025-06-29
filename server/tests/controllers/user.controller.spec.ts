@@ -23,12 +23,26 @@ const mockUserJSONResponse = {
   dateJoined: new Date('2024-12-03').toISOString(),
 };
 
-const saveUserSpy = jest.spyOn(util, 'saveUser');
-const loginUserSpy = jest.spyOn(util, 'loginUser');
-const updatedUserSpy = jest.spyOn(util, 'updateUser');
-const getUserByUsernameSpy = jest.spyOn(util, 'getUserByUsername');
-const getUsersListSpy = jest.spyOn(util, 'getUsersList');
-const deleteUserByUsernameSpy = jest.spyOn(util, 'deleteUserByUsername');
+let saveUserSpy: jest.SpyInstance;
+let loginUserSpy: jest.SpyInstance;
+let updatedUserSpy: jest.SpyInstance;
+let getUserByUsernameSpy: jest.SpyInstance;
+let getUsersListSpy: jest.SpyInstance;
+let deleteUserByUsernameSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  saveUserSpy = jest.spyOn(util, 'saveUser');
+  loginUserSpy = jest.spyOn(util, 'loginUser');
+  updatedUserSpy = jest.spyOn(util, 'updateUser');
+  getUserByUsernameSpy = jest.spyOn(util, 'getUserByUsername');
+  getUsersListSpy = jest.spyOn(util, 'getUsersList');
+  deleteUserByUsernameSpy = jest.spyOn(util, 'deleteUserByUsername');
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
+  jest.restoreAllMocks();
+});
 
 describe('Test userController', () => {
   describe('POST /signup', () => {
